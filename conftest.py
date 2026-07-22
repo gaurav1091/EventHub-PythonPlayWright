@@ -1,0 +1,115 @@
+import re
+from collections.abc import Generator
+from pathlib import Path
+
+import pytest
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright
+from pytest_html import extras as html_extras
+from pytest_metadata.plugin import metadata_key
+
+from eventhub_automation.api.eventhub_client import EventHubClient
+from eventhub_automation.core.config import Settings
+from eventhub_automation.core.logger import get_logger
+from eventhub_automation.flows.auth_flow import AuthFlow
+
+LOGGER = get_logger("pytest")
+REPORTS_DIR = Path("reports")
+ARTIFACTS_DIR = REPORTS_DIR / "artifacts"
+TRACES_DIR = Path("test-results") / "traces"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--browser-name", action="store", default=None, help="chromium/firefox/webkit")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    REPORTS_DIR.mkdir(exist_ok=True)
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    config.stash[metadata_key]["Project"] = "EventHub Pytest Automation"
+    config.stash[metadata_key]["Base URL"] = Settings().base_url
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
+    extras = getattr(report, "extras", [])
+
+    if report.when == "call" and report.failed:
+        funcargs = getattr(item, "funcargs", {})
+        page = funcargs.get("page") or funcargs.get("authenticated_page")
+        if page:
+            screenshot_path = ARTIFACTS_DIR / f"{item.name}.png"
+            page.screenshot(path=str(screenshot_path), full_page=True)
+            extras.append(html_extras.png(screenshot_path.read_bytes()))
+
+    report.extras = extras
+
+
+@pytest.fixture(scope="session")
+def settings(request: pytest.FixtureRequest) -> Settings:
+    settings = Settings()
+    browser_name = request.config.getoption("--browser-name")
+    base_url = request.config.getoption("--base-url")
+    headed = request.config.getoption("--headed")
+
+    if browser_name:
+        settings.browser = browser_name
+    if base_url:
+        settings.base_url = base_url.rstrip("/")
+    if headed:
+        settings.headless = False
+    return settings
+
+
+@pytest.fixture(scope="session")
+def browser(playwright: Playwright, settings: Settings) -> Generator[Browser, None, None]:
+    LOGGER.info("Launching %s browser; headless=%s", settings.browser, settings.headless)
+    browser_type = getattr(playwright, settings.browser)
+    browser = browser_type.launch(headless=settings.headless, slow_mo=settings.slow_mo_ms)
+    yield browser
+    browser.close()
+
+
+@pytest.fixture()
+def context(
+    browser: Browser,
+    request: pytest.FixtureRequest,
+) -> Generator[BrowserContext, None, None]:
+    context = browser.new_context(ignore_https_errors=True)
+    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    yield context
+    report = getattr(request.node, "rep_call", None)
+    if report and report.failed:
+        trace_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", request.node.nodeid)
+        trace_path = TRACES_DIR / f"{trace_name}.zip"
+        context.tracing.stop(path=str(trace_path))
+    else:
+        context.tracing.stop()
+    context.close()
+
+
+@pytest.fixture()
+def page(context: BrowserContext) -> Generator[Page, None, None]:
+    page = context.new_page()
+    yield page
+
+
+@pytest.fixture()
+def authenticated_page(page: Page, settings: Settings) -> Page:
+    return AuthFlow(page, settings.base_url).sign_in(settings.user_email, settings.user_password)
+
+
+@pytest.fixture()
+def api_client(settings: Settings) -> EventHubClient:
+    return EventHubClient(settings.api_base_url)
+
+
+@pytest.fixture()
+def authenticated_api_client(api_client: EventHubClient, settings: Settings) -> EventHubClient:
+    response = api_client.login(settings.user_email, settings.user_password)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    return api_client
