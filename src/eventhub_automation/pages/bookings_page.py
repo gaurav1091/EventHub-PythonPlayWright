@@ -27,10 +27,11 @@ class BookingsPage(BasePage):
         customer_name: str,
         total: str,
     ) -> None:
-        expect(self.page.get_by_text(booking_reference)).to_be_visible()
-        expect(self.page.get_by_role("heading", name=event_name)).to_be_visible()
-        expect(self.page.get_by_text(customer_name)).to_be_visible()
-        expect(self.page.get_by_text(total).last).to_be_visible()
+        booking_card = self._booking_card(booking_reference)
+        expect(booking_card.get_by_text(booking_reference, exact=True)).to_be_visible()
+        expect(booking_card.get_by_role("heading", name=event_name).first).to_be_visible()
+        expect(booking_card.get_by_text(customer_name, exact=True)).to_be_visible()
+        expect(booking_card.get_by_text(total, exact=True).last).to_be_visible()
 
     def open_booking_details(self, booking_reference: str) -> None:
         booking_card = self._booking_card(booking_reference)

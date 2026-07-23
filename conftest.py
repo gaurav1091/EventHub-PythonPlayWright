@@ -1,5 +1,7 @@
 import base64
+import os
 import re
+import shutil
 from collections.abc import Generator
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from eventhub_automation.flows.auth_flow import AuthFlow
 LOGGER = get_logger("pytest")
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = REPORTS_DIR / "artifacts"
+ALLURE_RESULTS_DIR = REPORTS_DIR / "allure-results"
 TRACES_DIR = Path("test-results") / "traces"
 
 
@@ -32,8 +35,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    REPORTS_DIR.mkdir(exist_ok=True)
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    clean_reports = os.getenv("EVENTHUB_CLEAN_REPORTS", "true").lower() in {"1", "true", "yes"}
+    is_xdist_worker = hasattr(config, "workerinput")
+    if clean_reports and not is_xdist_worker:
+        shutil.rmtree(REPORTS_DIR, ignore_errors=True)
+        shutil.rmtree(TRACES_DIR.parent, ignore_errors=True)
+
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    ALLURE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     TRACES_DIR.mkdir(parents=True, exist_ok=True)
     config.stash[metadata_key]["Project"] = "EventHub Pytest Automation"
     config.stash[metadata_key]["Base URL"] = Settings().base_url
