@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         alias="EVENTHUB_API_BASE_URL",
     )
     user_email: str = Field(default="", alias="EVENTHUB_USER_EMAIL")
-    user_password: str = Field(default="", alias="EVENTHUB_USER_PASSWORD")
+    user_password: str = Field(default="", alias="EVENTHUB_USER_PASSWORD", repr=False)
     browser: str = Field(default="chromium", alias="BROWSER")
     headless: bool = Field(default=True, alias="HEADLESS")
     slow_mo_ms: int = Field(default=0, alias="SLOW_MO_MS")

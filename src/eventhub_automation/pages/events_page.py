@@ -1,4 +1,5 @@
 from playwright.sync_api import Page, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from eventhub_automation.core.base_page import BasePage
 
@@ -30,10 +31,12 @@ class EventsPage(BasePage):
     def open_event(self, event_name: str) -> None:
         event_link = self.page.get_by_role("link", name=event_name)
         href = event_link.get_attribute("href")
+        event_link.click()
         if href:
-            self.page.goto(f"{self.base_url}{href}")
-        else:
-            event_link.click()
+            try:
+                self.page.wait_for_url(f"**{href}", wait_until="domcontentloaded", timeout=5000)
+            except PlaywrightTimeoutError:
+                self.page.goto(f"{self.base_url}{href}", wait_until="commit")
 
     def assert_event_visible(self, event_name: str) -> None:
         expect(self.page.get_by_role("heading", name=event_name)).to_be_visible()

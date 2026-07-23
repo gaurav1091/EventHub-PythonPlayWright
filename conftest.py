@@ -1,3 +1,4 @@
+import base64
 import re
 from collections.abc import Generator
 from pathlib import Path
@@ -43,7 +44,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         if page:
             screenshot_path = ARTIFACTS_DIR / f"{item.name}.png"
             page.screenshot(path=str(screenshot_path), full_page=True)
-            extras.append(html_extras.png(screenshot_path.read_bytes()))
+            screenshot = base64.b64encode(screenshot_path.read_bytes()).decode("utf-8")
+            extras.append(html_extras.png(screenshot))
 
     report.extras = extras
 
