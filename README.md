@@ -54,6 +54,7 @@ eventhub_pytest_framework/
 
 ## Quality Gates
 
+
 Run local checks before pushing:
 
 ```bash
