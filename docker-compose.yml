@@ -1,0 +1,15 @@
+services:
+  eventhub-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eventhub-pytest-framework:latest
+    env_file:
+      - .env
+    environment:
+      HEADLESS: "true"
+      BROWSER: "${BROWSER:-chromium}"
+    volumes:
+      - ./reports:/app/reports
+      - ./test-results:/app/test-results
+    command: pytest

@@ -32,6 +32,34 @@ Run against Firefox:
 pytest --browser-name firefox
 ```
 
+## Docker Commands
+
+Build the Docker image:
+
+```bash
+docker compose build
+```
+
+Run the default test command:
+
+```bash
+docker compose run --rm eventhub-tests
+```
+
+Run API tests:
+
+```bash
+docker compose run --rm eventhub-tests pytest tests/api -m api
+```
+
+Run UI tests against Firefox:
+
+```bash
+docker compose run --rm eventhub-tests pytest tests/ui --browser-name firefox
+```
+
+The Docker service reads `.env` and mounts `reports/` plus `test-results/` so reports, logs, screenshots, Allure results, and traces are available on the host machine after the run.
+
 ## Reports And Artifacts
 
 The framework generates these artifacts:

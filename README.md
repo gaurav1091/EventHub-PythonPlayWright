@@ -23,6 +23,29 @@ pytest
 
 See [Test Execution](docs/test_execution.md) for reporting, logging, browser, marker, and artifact commands.
 
+## Docker Quick Start
+
+Build the test image:
+
+```bash
+docker compose build
+```
+
+Run the default suite in Docker:
+
+```bash
+docker compose run --rm eventhub-tests
+```
+
+Run a targeted Docker command:
+
+```bash
+docker compose run --rm eventhub-tests pytest tests/api -m api
+docker compose run --rm eventhub-tests pytest tests/ui --browser-name firefox
+```
+
+Docker uses `.env` for EventHub credentials and writes reports back to local `reports/` and `test-results/`.
+
 ## Structure
 
 ```text
