@@ -5,6 +5,47 @@ from eventhub_automation.data.factories import CustomerFactory, EventFactory
 
 
 @pytest.mark.api
+def test_get_event_by_valid_static_id(authenticated_api_client: EventHubClient):
+    response = authenticated_api_client.get_event(1)
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["success"] is True
+    assert body["data"]["id"] == 1
+    assert body["data"]["title"] == "World Tech Summit"
+
+
+@pytest.mark.api
+def test_get_event_by_invalid_id_returns_not_found(authenticated_api_client: EventHubClient):
+    response = authenticated_api_client.get_event(999999999)
+    body = response.json()
+
+    assert response.status_code == 404
+    assert body["success"] is False
+    assert "not found" in body["error"]
+
+
+@pytest.mark.api
+def test_delete_non_existing_event_returns_not_found(authenticated_api_client: EventHubClient):
+    response = authenticated_api_client.delete_event(999999999)
+    body = response.json()
+
+    assert response.status_code == 404
+    assert body["success"] is False
+    assert "not found" in body["error"]
+
+
+@pytest.mark.api
+def test_static_event_cannot_be_deleted(authenticated_api_client: EventHubClient):
+    response = authenticated_api_client.delete_event(1)
+    body = response.json()
+
+    assert response.status_code == 403
+    assert body["success"] is False
+    assert body["error"] == "Cannot delete a static event"
+
+
+@pytest.mark.api
 def test_events_api_can_create_update_get_and_delete_event(
     authenticated_api_client: EventHubClient,
 ):
@@ -95,9 +136,99 @@ def test_invalid_event_creation_returns_validation_error(
     assert response.status_code == 400
     assert body["success"] is False
     assert body["error"] == "Validation failed"
-    assert {"category", "venue", "city", "eventDate", "price", "totalSeats"}.issubset(
-        error_fields
-    )
+    assert {"category", "venue", "city", "eventDate", "price", "totalSeats"}.issubset(error_fields)
+
+
+@pytest.mark.api
+def test_event_creation_requires_title(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Missing Title Event")
+    payload = authenticated_api_client._event_payload(event)
+    payload.pop("title")
+
+    response = authenticated_api_client.create_event_with_payload(payload)
+    body = response.json()
+    error_fields = {detail["field"] for detail in body["details"]}
+
+    assert response.status_code == 400
+    assert body["success"] is False
+    assert "title" in error_fields
+
+
+@pytest.mark.api
+@pytest.mark.xfail(reason="API currently accepts arbitrary event categories")
+def test_event_creation_rejects_invalid_category(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Invalid Category Event")
+    payload = authenticated_api_client._event_payload(event)
+    payload["category"] = "InvalidCategory"
+    event_id = 0
+
+    try:
+        response = authenticated_api_client.create_event_with_payload(payload)
+        body = response.json()
+        if response.status_code == 201:
+            event_id = body["data"]["id"]
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "category" in body["error"].lower()
+    finally:
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+def test_event_creation_rejects_negative_price(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Negative Price Event")
+    payload = authenticated_api_client._event_payload(event)
+    payload["price"] = -1
+
+    response = authenticated_api_client.create_event_with_payload(payload)
+    body = response.json()
+    error_fields = {detail["field"] for detail in body["details"]}
+
+    assert response.status_code == 400
+    assert body["success"] is False
+    assert "price" in error_fields
+
+
+@pytest.mark.api
+def test_event_creation_rejects_zero_seats(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Zero Seats Event")
+    payload = authenticated_api_client._event_payload(event)
+    payload["totalSeats"] = 0
+
+    response = authenticated_api_client.create_event_with_payload(payload)
+    body = response.json()
+    error_fields = {detail["field"] for detail in body["details"]}
+
+    assert response.status_code == 400
+    assert body["success"] is False
+    assert "totalSeats" in error_fields
+
+
+@pytest.mark.api
+def test_event_update_rejects_invalid_payload(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Invalid Update Event")
+    event_id = 0
+
+    try:
+        create_response = authenticated_api_client.create_event(event)
+        event_id = create_response.json()["data"]["id"]
+
+        response = authenticated_api_client.session.put(
+            f"{authenticated_api_client.base_url}/events/{event_id}",
+            json={"title": event.title, "price": -1},
+            timeout=15,
+        )
+        body = response.json()
+        error_fields = {detail["field"] for detail in body["details"]}
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "price" in error_fields
+    finally:
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
 
 
 @pytest.mark.api
@@ -201,5 +332,216 @@ def test_cancelling_booking_releases_available_seats(authenticated_api_client: E
     finally:
         if booking_id:
             authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_booking_creation_rejects_invalid_event_id(authenticated_api_client: EventHubClient):
+    customer = CustomerFactory.booking_customer(email_prefix="codex.invalid.event")
+    response = authenticated_api_client.create_booking(999999999, customer)
+    body = response.json()
+
+    assert response.status_code == 404
+    assert body["success"] is False
+    assert "not found" in body["error"]
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_booking_creation_rejects_quantity_zero(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Quantity Zero Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.quantity.zero")
+    event_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        response = authenticated_api_client.create_booking(event_id, customer, quantity=0)
+        body = response.json()
+        error_fields = {detail["field"] for detail in body["details"]}
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "quantity" in error_fields
+    finally:
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_booking_creation_rejects_quantity_greater_than_max(
+    authenticated_api_client: EventHubClient,
+):
+    event = EventFactory.workshop(title_prefix="Codex API Quantity Max Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.quantity.max")
+    event_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        response = authenticated_api_client.create_booking(event_id, customer, quantity=11)
+        body = response.json()
+        error_fields = {detail["field"] for detail in body["details"]}
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "quantity" in error_fields
+    finally:
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_booking_creation_rejects_invalid_customer_email(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Invalid Customer Email Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.invalid.customer")
+    invalid_customer = customer.__class__(customer.full_name, "not-an-email", customer.phone)
+    event_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        response = authenticated_api_client.create_booking(event_id, invalid_customer)
+        body = response.json()
+        error_fields = {detail["field"] for detail in body["details"]}
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "customerEmail" in error_fields
+    finally:
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_lookup_invalid_booking_reference_returns_not_found(
+    authenticated_api_client: EventHubClient,
+):
+    response = authenticated_api_client.get_booking_by_reference("NO-SUCH-REF")
+    body = response.json()
+
+    assert response.status_code == 404
+    assert body["success"] is False
+    assert "not found" in body["error"]
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_cancel_already_cancelled_booking_returns_not_found(
+    authenticated_api_client: EventHubClient,
+):
+    event = EventFactory.workshop(title_prefix="Codex API Double Cancel Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.double.cancel")
+    event_id = 0
+    booking_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        booking_response = authenticated_api_client.create_booking(event_id, customer)
+        booking_id = booking_response.json()["data"]["id"]
+
+        first_cancel_response = authenticated_api_client.cancel_booking(booking_id)
+        second_cancel_response = authenticated_api_client.cancel_booking(booking_id)
+        booking_id = 0
+        body = second_cancel_response.json()
+
+        assert first_cancel_response.status_code == 200
+        assert second_cancel_response.status_code == 404
+        assert body["success"] is False
+        assert "not found" in body["error"]
+    finally:
+        if booking_id:
+            authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_get_booking_by_id(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Get Booking Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.get.booking")
+    event_id = 0
+    booking_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        booking_response = authenticated_api_client.create_booking(event_id, customer)
+        booking_id = booking_response.json()["data"]["id"]
+
+        get_response = authenticated_api_client.get_booking(booking_id)
+        body = get_response.json()
+
+        assert get_response.status_code == 200
+        assert body["success"] is True
+        assert body["data"]["id"] == booking_id
+        assert body["data"]["customerEmail"] == customer.email
+    finally:
+        if booking_id:
+            authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_list_bookings_includes_newly_created_booking(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API List Booking Event")
+    customer = CustomerFactory.booking_customer(email_prefix="codex.list.booking")
+    event_id = 0
+    booking_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        booking_response = authenticated_api_client.create_booking(event_id, customer)
+        booking_id = booking_response.json()["data"]["id"]
+
+        list_response = authenticated_api_client.list_bookings()
+        booking_ids = {booking["id"] for booking in list_response.json()["data"]}
+
+        assert list_response.status_code == 200
+        assert booking_id in booking_ids
+    finally:
+        if booking_id:
+            authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.api
+@pytest.mark.booking
+def test_user_cannot_book_more_seats_than_available(authenticated_api_client: EventHubClient):
+    event = EventFactory.workshop(title_prefix="Codex API Overbook Event")
+    event = event.__class__(
+        title=event.title,
+        description=event.description,
+        category=event.category,
+        city=event.city,
+        venue=event.venue,
+        date_time=event.date_time,
+        price=event.price,
+        total_seats="2",
+    )
+    customer = CustomerFactory.booking_customer(email_prefix="codex.overbook")
+    event_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        response = authenticated_api_client.create_booking(event_id, customer, quantity=3)
+        body = response.json()
+
+        assert response.status_code == 400
+        assert body["success"] is False
+        assert "available" in body["error"]
+    finally:
         if event_id:
             authenticated_api_client.delete_event(event_id)

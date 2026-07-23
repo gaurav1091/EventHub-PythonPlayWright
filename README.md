@@ -5,7 +5,7 @@ Enterprise-grade starter framework for automating the EventHub practice app with
 ## Current Scope
 
 - UI automation first: auth, event discovery, event details, bookings, booking management, and admin event management.
-- Designed to grow into a hybrid UI + API framework without rewriting test architecture.
+- Hybrid UI + API automation: API clients support fast setup/cleanup, while UI tests validate user-facing behavior.
 - Inspired by the attached `PytestPython` project, but cleaned up for maintainability, scalability, and test data hygiene.
 
 ## Quick Start
@@ -48,5 +48,25 @@ eventhub_pytest_framework/
 - Tests describe business behavior; page objects handle UI interaction.
 - Locators live in page classes, not in tests.
 - Configuration comes from environment variables and CLI options, not hard-coded credentials.
-- API clients will sit beside UI page objects, enabling hybrid setup/cleanup and faster validations.
+- API clients sit beside UI page objects, enabling hybrid setup/cleanup and faster validations.
 - Reports, traces, screenshots, and videos are generated only when useful.
+
+
+## Quality Gates
+
+Run local checks before pushing:
+
+```bash
+ruff check src tests conftest.py
+mypy src tests conftest.py
+pytest
+```
+
+Optional pre-commit hooks are configured in `.pre-commit-config.yaml`:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browser matrix. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.

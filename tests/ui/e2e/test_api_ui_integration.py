@@ -74,3 +74,110 @@ def test_api_created_booking_appears_in_ui_my_bookings(
             authenticated_api_client.cancel_booking(booking_id)
         if event_id:
             authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.e2e
+@pytest.mark.api
+def test_ui_created_event_is_visible_in_api(
+    authenticated_page,
+    settings,
+    authenticated_api_client: EventHubClient,
+):
+    from eventhub_automation.flows.admin_event_flow import AdminEventFlow
+
+    admin_event_flow = AdminEventFlow(authenticated_page, settings.base_url)
+    event = EventFactory.workshop(title_prefix="Codex Hybrid UI Event")
+
+    try:
+        admin_event_flow.create_event(event, "15 Dec 2026")
+        api_event = authenticated_api_client.find_event_by_title(event.title)
+
+        assert api_event is not None
+        assert api_event["title"] == event.title
+        assert api_event["category"] == event.category
+    finally:
+        authenticated_api_client.delete_event_by_title_if_present(event.title)
+
+
+@pytest.mark.e2e
+@pytest.mark.api
+@pytest.mark.booking
+def test_api_cancelled_booking_is_removed_from_ui_my_bookings(
+    authenticated_page,
+    settings,
+    authenticated_api_client: EventHubClient,
+):
+    bookings_page = BookingsPage(authenticated_page, settings.base_url)
+    event = EventFactory.workshop(title_prefix="Codex Hybrid Cancel Booking Event")
+    customer = CustomerFactory.booking_customer(
+        name_prefix="Codex Hybrid Cancel Customer",
+        email_prefix="codex.hybrid.cancel",
+    )
+    event_id = 0
+    booking_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+        booking_response = authenticated_api_client.create_booking(event_id, customer)
+        booking_body = booking_response.json()
+        booking_id = booking_body["data"]["id"]
+        booking_reference = booking_body["data"]["bookingRef"]
+
+        bookings_page.load()
+        bookings_page.assert_booking_visible(booking_reference)
+
+        cancel_response = authenticated_api_client.cancel_booking(booking_id)
+        booking_id = 0
+
+        assert cancel_response.status_code == 200
+
+        bookings_page.load()
+        bookings_page.assert_booking_not_visible(booking_reference)
+    finally:
+        if booking_id:
+            authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)
+
+
+@pytest.mark.e2e
+@pytest.mark.api
+@pytest.mark.booking
+def test_api_created_event_can_be_booked_in_ui_and_cleaned_by_api(
+    authenticated_page,
+    settings,
+    authenticated_api_client: EventHubClient,
+):
+    events_page = EventsPage(authenticated_page, settings.base_url)
+    event_detail_page = EventDetailPage(authenticated_page)
+    event = EventFactory.workshop(title_prefix="Codex Hybrid UI Booking Event")
+    customer = CustomerFactory.booking_customer(
+        name_prefix="Codex Hybrid UI Booking Customer",
+        email_prefix="codex.hybrid.ui.booking",
+    )
+    event_id = 0
+    booking_id = 0
+
+    try:
+        event_response = authenticated_api_client.create_event(event)
+        event_id = event_response.json()["data"]["id"]
+
+        events_page.load()
+        events_page.search(event.title)
+        events_page.open_event(event.title)
+        event_detail_page.fill_customer(customer)
+        event_detail_page.confirm_booking()
+        booking_reference = event_detail_page.get_booking_reference()
+
+        api_booking_response = authenticated_api_client.get_booking_by_reference(booking_reference)
+        api_booking = api_booking_response.json()["data"]
+        booking_id = api_booking["id"]
+
+        assert api_booking["customerName"] == customer.full_name
+        assert api_booking["event"]["title"] == event.title
+    finally:
+        if booking_id:
+            authenticated_api_client.cancel_booking(booking_id)
+        if event_id:
+            authenticated_api_client.delete_event(event_id)

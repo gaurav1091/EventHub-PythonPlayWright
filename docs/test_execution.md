@@ -47,3 +47,38 @@ Open a retained Playwright trace with:
 ```bash
 playwright show-trace test-results/path-to-trace.zip
 ```
+
+
+## Local Quality Gates
+
+Run static checks before a full regression:
+
+```bash
+ruff check src tests conftest.py
+mypy src tests conftest.py
+```
+
+Install and run pre-commit hooks:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+## CI
+
+GitHub Actions workflow: `.github/workflows/tests.yml`
+
+The workflow runs:
+
+- Ruff lint checks
+- mypy type checks
+- API tests
+- UI and hybrid tests across Chromium and Firefox
+- Report and Playwright artifact upload for every test job
+
+Configure these repository secrets before enabling CI:
+
+- `EVENTHUB_BASE_URL`
+- `EVENTHUB_USER_EMAIL`
+- `EVENTHUB_USER_PASSWORD`
