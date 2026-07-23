@@ -1,5 +1,7 @@
 # EventHub Pytest Automation Framework
 
+![EventHub Automation Tests](https://github.com/gaurav1091/EventHub-PythonPlayWright/actions/workflows/tests.yml/badge.svg)
+
 Enterprise-grade starter framework for automating the EventHub practice app with Python, Pytest, and Playwright.
 
 ## Current Scope
@@ -70,4 +72,9 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browser matrix. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.
+GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browser matrix. The workflow has been validated successfully in GitHub Actions. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.
+
+
+## Reporting
+
+The framework writes pytest-html, JUnit XML, logs, failure screenshots, Playwright traces, and Allure result files. Use `allure serve reports/allure-results` when the Allure CLI is installed locally.

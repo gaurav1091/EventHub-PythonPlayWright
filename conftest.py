@@ -3,6 +3,7 @@ import re
 from collections.abc import Generator
 from pathlib import Path
 
+import allure
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright
 from pytest_html import extras as html_extras
@@ -11,6 +12,7 @@ from pytest_metadata.plugin import metadata_key
 from eventhub_automation.api.eventhub_client import EventHubClient
 from eventhub_automation.core.config import Settings
 from eventhub_automation.core.logger import get_logger
+from eventhub_automation.data.lifecycle import TestDataManager, managed_test_data
 from eventhub_automation.flows.auth_flow import AuthFlow
 
 LOGGER = get_logger("pytest")
@@ -21,6 +23,12 @@ TRACES_DIR = Path("test-results") / "traces"
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--browser-name", action="store", default=None, help="chromium/firefox/webkit")
+    parser.addoption(
+        "--run-quarantine",
+        action="store_true",
+        default=False,
+        help="include tests marked quarantine",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -29,6 +37,16 @@ def pytest_configure(config: pytest.Config) -> None:
     TRACES_DIR.mkdir(parents=True, exist_ok=True)
     config.stash[metadata_key]["Project"] = "EventHub Pytest Automation"
     config.stash[metadata_key]["Base URL"] = Settings().base_url
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if config.getoption("--run-quarantine"):
+        return
+
+    skip_quarantine = pytest.mark.skip(reason="quarantined; rerun with --run-quarantine")
+    for item in items:
+        if "quarantine" in item.keywords:
+            item.add_marker(skip_quarantine)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -44,8 +62,14 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
         if page:
             screenshot_path = ARTIFACTS_DIR / f"{item.name}.png"
             page.screenshot(path=str(screenshot_path), full_page=True)
-            screenshot = base64.b64encode(screenshot_path.read_bytes()).decode("utf-8")
+            screenshot_bytes = screenshot_path.read_bytes()
+            screenshot = base64.b64encode(screenshot_bytes).decode("utf-8")
             extras.append(html_extras.png(screenshot))
+            allure.attach(
+                screenshot_bytes,
+                name=item.name,
+                attachment_type=allure.attachment_type.PNG,
+            )
 
     report.extras = extras
 
@@ -115,3 +139,8 @@ def authenticated_api_client(api_client: EventHubClient, settings: Settings) -> 
     assert response.status_code == 200
     assert response.json()["success"] is True
     return api_client
+
+
+@pytest.fixture()
+def test_data(authenticated_api_client: EventHubClient) -> Generator[TestDataManager, None, None]:
+    yield from managed_test_data(authenticated_api_client)

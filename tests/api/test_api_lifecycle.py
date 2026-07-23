@@ -155,7 +155,8 @@ def test_event_creation_requires_title(authenticated_api_client: EventHubClient)
 
 
 @pytest.mark.api
-@pytest.mark.xfail(reason="API currently accepts arbitrary event categories")
+@pytest.mark.backend_gap
+@pytest.mark.xfail(reason="API currently accepts arbitrary event categories", strict=True)
 def test_event_creation_rejects_invalid_category(authenticated_api_client: EventHubClient):
     event = EventFactory.workshop(title_prefix="Codex API Invalid Category Event")
     payload = authenticated_api_client._event_payload(event)

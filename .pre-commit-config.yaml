@@ -19,6 +19,7 @@ repos:
           - pytest-html>=4.1.0
           - pytest-xdist>=3.6.0
           - pytest-rerunfailures>=14.0
+          - allure-pytest>=2.13.5
           - python-dotenv>=1.0.1
           - pydantic>=2.7.0
           - pydantic-settings>=2.3.0

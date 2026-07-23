@@ -14,6 +14,7 @@ dependencies = [
     "pytest-html>=4.1.0",
     "pytest-xdist>=3.6.0",
     "pytest-rerunfailures>=14.0",
+    "allure-pytest>=2.13.5",
     "python-dotenv>=1.0.1",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
@@ -42,7 +43,7 @@ python_version = "3.11"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml"
+addopts = "-ra --strict-markers --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml --alluredir=reports/allure-results"
 testpaths = ["tests"]
 pythonpath = ["src"]
 log_file = "reports/test-run.log"
@@ -62,4 +63,7 @@ markers = [
     "admin: admin event management tests",
     "api: API tests",
     "e2e: end-to-end user journeys",
+    "flaky: test has a documented intermittent failure mode and limited retry allowance",
+    "quarantine: temporarily excluded from default runs until fixed",
+    "backend_gap: executable documentation of a known backend behavior gap",
 ]
