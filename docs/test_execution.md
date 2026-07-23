@@ -111,6 +111,11 @@ The workflow runs:
 - API tests
 - UI and hybrid tests across Chromium and Firefox
 - Report and Playwright artifact upload for every test job
+- Allure HTML report publishing to GitHub Pages for push and manual workflow runs
+
+After a GitHub Actions run finishes, open the workflow run summary and use the **Allure Report** link. Pull request runs do not publish the report to Pages.
+
+Before using the hosted report link, configure the repository Pages source as **GitHub Actions** in GitHub repository settings.
 
 Configure these repository secrets before enabling CI:
 

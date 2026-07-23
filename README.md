@@ -100,4 +100,4 @@ GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browse
 
 ## Reporting
 
-The framework writes pytest-html, JUnit XML, logs, failure screenshots, Playwright traces, and Allure result files. Use `allure serve reports/allure-results` when the Allure CLI is installed locally.
+The framework writes pytest-html, JUnit XML, logs, failure screenshots, Playwright traces, and Allure result files. GitHub Actions publishes the Allure HTML report to GitHub Pages and adds the report link to the workflow summary. Use `allure serve reports/allure-results` when the Allure CLI is installed locally.
