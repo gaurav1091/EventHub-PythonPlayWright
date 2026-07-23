@@ -310,7 +310,7 @@ jobs:
       - manual-tests
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.report-url.outputs.url }}
     steps:
       - name: Download manual test report artifact
         if: github.event_name == 'workflow_dispatch'
@@ -415,11 +415,16 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+      - name: Set run-specific report URL
+        if: steps.allure-results.outputs.result_count != '0'
+        id: report-url
+        run: echo "url=${{ steps.deployment.outputs.page_url }}runs/${{ github.run_id }}/" >> "$GITHUB_OUTPUT"
+
       - name: Add Allure report link to workflow summary
         if: steps.allure-results.outputs.result_count != '0'
         run: |
           echo "### Allure Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "[Open this run's Allure report](${{ steps.deployment.outputs.page_url }}runs/${{ github.run_id }}/)" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open this run's Allure report](${{ steps.report-url.outputs.url }})" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Report path: \`runs/${{ github.run_id }}/\`" >> "$GITHUB_STEP_SUMMARY"
