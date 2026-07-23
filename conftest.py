@@ -58,6 +58,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip_quarantine)
 
 
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    browser_name = item.config.getoption("--browser-name")
+    if browser_name:
+        allure.dynamic.parameter("browser", browser_name)
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
     outcome = yield
