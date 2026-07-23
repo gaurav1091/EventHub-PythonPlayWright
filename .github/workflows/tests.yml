@@ -360,6 +360,46 @@ jobs:
         if: steps.allure-results.outputs.result_count != '0'
         run: allure generate combined-allure-results --clean -o allure-report
 
+      - name: Restore published report history
+        if: steps.allure-results.outputs.result_count != '0'
+        uses: actions/cache/restore@v4
+        with:
+          path: site
+          key: allure-site-${{ github.run_id }}
+          restore-keys: |
+            allure-site-
+
+      - name: Prepare GitHub Pages site
+        if: steps.allure-results.outputs.result_count != '0'
+        run: |
+          set -euo pipefail
+          report_path="runs/${{ github.run_id }}"
+
+          mkdir -p "site/$report_path" site/latest
+          cp -R allure-report/. "site/$report_path/"
+          cp -R allure-report/. site/latest/
+
+          cat > site/index.html <<EOF
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=$report_path/">
+              <title>EventHub Allure Report</title>
+            </head>
+            <body>
+              <p><a href="$report_path/">Open latest Allure report</a></p>
+            </body>
+          </html>
+          EOF
+
+      - name: Save published report history
+        if: steps.allure-results.outputs.result_count != '0'
+        uses: actions/cache/save@v4
+        with:
+          path: site
+          key: allure-site-${{ github.run_id }}
+
       - name: Configure GitHub Pages
         if: steps.allure-results.outputs.result_count != '0'
         uses: actions/configure-pages@v5
@@ -368,7 +408,7 @@ jobs:
         if: steps.allure-results.outputs.result_count != '0'
         uses: actions/upload-pages-artifact@v4
         with:
-          path: allure-report
+          path: site
 
       - name: Deploy Allure report to GitHub Pages
         if: steps.allure-results.outputs.result_count != '0'
@@ -380,4 +420,6 @@ jobs:
         run: |
           echo "### Allure Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "[Open Allure report](${{ steps.deployment.outputs.page_url }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open this run's Allure report](${{ steps.deployment.outputs.page_url }}runs/${{ github.run_id }}/)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Report path: \`runs/${{ github.run_id }}/\`" >> "$GITHUB_STEP_SUMMARY"
