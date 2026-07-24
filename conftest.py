@@ -33,6 +33,7 @@ ALLURE_MARKER_FEATURES = {
     "smoke": ("Smoke", "Critical Paths"),
     "regression": ("Regression", "Full Coverage"),
     "backend_gap": ("Backend Gaps", "Known Product Gaps"),
+    "serial": ("Execution Policy", "Serial Tests"),
 }
 
 

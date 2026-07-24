@@ -66,4 +66,5 @@ markers = [
     "flaky: test has a documented intermittent failure mode and limited retry allowance",
     "quarantine: temporarily excluded from default runs until fixed",
     "backend_gap: executable documentation of a known backend behavior gap",
+    "serial: test intentionally requires exclusive shared state and should not be included in parallel runs",
 ]

@@ -41,6 +41,19 @@ Run against Firefox:
 pytest --browser-name firefox
 ```
 
+Run with pytest-xdist parallel workers:
+
+```bash
+pytest tests/api -m "api and not quarantine" -n auto --dist loadscope
+pytest tests/ui -m "not quarantine" --browser-name chromium -n 2 --dist loadscope
+```
+
+Keep a run serial when debugging or when validating tests that intentionally share mutable backend state:
+
+```bash
+pytest tests/ui --browser-name chromium
+```
+
 ## Docker Commands
 
 Build the Docker image:
@@ -65,6 +78,12 @@ Run UI tests against Firefox:
 
 ```bash
 docker compose run --rm eventhub-tests pytest tests/ui --browser-name firefox
+```
+
+Run API tests in parallel:
+
+```bash
+docker compose run --rm eventhub-tests pytest tests/api -m api -n auto --dist loadscope
 ```
 
 The Docker service reads `.env` and mounts `reports/` plus `test-results/` so reports, logs, screenshots, Allure results, and traces are available on the host machine after the run.
@@ -103,6 +122,7 @@ Allure reports are grouped automatically from pytest markers:
 - `smoke`: critical health checks and core user confidence tests
 - `regression`: broader coverage intended for scheduled or pre-release runs
 - `backend_gap`: known backend behavior gaps, normally paired with strict `xfail`
+- `serial`: intentionally excluded from parallel execution plans until isolated
 
 Browser-specific UI runs add the browser as an Allure parameter so Chromium and Firefox executions are reported separately.
 
@@ -133,8 +153,17 @@ The workflow runs:
 - mypy type checks
 - API tests
 - UI and hybrid tests across Chromium and Firefox
+- Parallel pytest workers for CI speed, using xdist `loadscope`
 - Report and Playwright artifact upload for every test job
 - Allure HTML report publishing to GitHub Pages for push and manual workflow runs
+
+Push and pull request runs use these worker defaults:
+
+- API tests: `-n auto --dist loadscope`
+- UI Chromium: `-n 2 --dist loadscope`
+- UI Firefox: `-n 2 --dist loadscope`
+
+Manual workflow runs include a **Parallel pytest workers** choice. Use `1` for serial/debug runs, or `2`, `4`, or `auto` for parallel execution.
 
 After a GitHub Actions run finishes, open the workflow run summary and use the **Allure Report** link. Pull request runs do not publish the report to Pages.
 
@@ -160,6 +189,8 @@ pytest --run-quarantine
 Use `@pytest.mark.flaky` only for tests with a documented intermittent external dependency. Prefer fixing selectors, waits, and test data isolation before adding retry behavior.
 
 Known backend behavior gaps should use `@pytest.mark.backend_gap` plus `pytest.mark.xfail(..., strict=True)` so the suite tells us when the backend behavior changes.
+
+Use `@pytest.mark.serial` only when a test cannot yet be made data-isolated. Serial tests should be rare, documented, and tracked for isolation work before being allowed into default parallel CI.
 
 ## API Test Style
 

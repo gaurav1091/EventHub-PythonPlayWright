@@ -32,9 +32,21 @@ on:
           - chrome
           - firefox
           - all
+      parallel_workers:
+        description: "Parallel pytest workers"
+        required: true
+        default: "2"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "4"
+          - auto
 
 env:
   EVENTHUB_CLEAN_REPORTS: "false"
+  API_WORKERS: auto
+  UI_WORKERS: "2"
 
 permissions:
   contents: read
@@ -98,7 +110,7 @@ jobs:
           mkdir -p reports/allure-results test-results
 
       - name: Run API tests
-        run: pytest tests/api -m "api and not quarantine"
+        run: pytest tests/api -m "api and not quarantine" -n "$API_WORKERS" --dist loadscope
 
       - name: Add Allure environment metadata
         if: always()
@@ -108,6 +120,7 @@ jobs:
             echo "Run Type=push_or_pull_request"
             echo "Selected Suite=api"
             echo "Selected Browser=not_applicable"
+            echo "Parallel Workers=${{ env.API_WORKERS }}"
             echo "Workflow=${{ github.workflow }}"
             echo "Run ID=${{ github.run_id }}"
           } > reports/allure-results/environment.properties
@@ -158,7 +171,7 @@ jobs:
           mkdir -p reports/allure-results test-results
 
       - name: Run UI and hybrid tests
-        run: pytest tests/ui -m "not quarantine" --browser-name ${{ matrix.browser }}
+        run: pytest tests/ui -m "not quarantine" --browser-name ${{ matrix.browser }} -n "$UI_WORKERS" --dist loadscope
 
       - name: Add Allure environment metadata
         if: always()
@@ -168,6 +181,7 @@ jobs:
             echo "Run Type=push_or_pull_request"
             echo "Selected Suite=ui"
             echo "Selected Browser=${{ matrix.browser }}"
+            echo "Parallel Workers=${{ env.UI_WORKERS }}"
             echo "Workflow=${{ github.workflow }}"
             echo "Run ID=${{ github.run_id }}"
           } > reports/allure-results/environment.properties
@@ -194,6 +208,7 @@ jobs:
       EVENTHUB_USER_PASSWORD: ${{ secrets.EVENTHUB_USER_PASSWORD }}
       TEST_TYPE: ${{ inputs.test_type }}
       SELECTED_BROWSER: ${{ inputs.browser }}
+      PARALLEL_WORKERS: ${{ inputs.parallel_workers }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -264,13 +279,18 @@ jobs:
             PLAYWRIGHT_BROWSER="$SELECTED_BROWSER"
           fi
 
+          xdist_args=()
+          if [ "$PARALLEL_WORKERS" != "1" ]; then
+            xdist_args=(-n "$PARALLEL_WORKERS" --dist loadscope)
+          fi
+
           if [ "$TEST_TYPE" = "api" ]; then
-            pytest "${pytest_args[@]}"
+            pytest "${pytest_args[@]}" "${xdist_args[@]}"
           elif [ "$SELECTED_BROWSER" = "all" ]; then
-            pytest "${pytest_args[@]}" --browser-name chromium
-            pytest "${pytest_args[@]}" --browser-name firefox
+            pytest "${pytest_args[@]}" --browser-name chromium "${xdist_args[@]}"
+            pytest "${pytest_args[@]}" --browser-name firefox "${xdist_args[@]}"
           else
-            pytest "${pytest_args[@]}" --browser-name "$PLAYWRIGHT_BROWSER"
+            pytest "${pytest_args[@]}" --browser-name "$PLAYWRIGHT_BROWSER" "${xdist_args[@]}"
           fi
 
       - name: Add Allure environment metadata
@@ -281,6 +301,7 @@ jobs:
             echo "Run Type=manual"
             echo "Selected Suite=${{ inputs.test_type }}"
             echo "Selected Browser=${{ inputs.browser }}"
+            echo "Parallel Workers=${{ inputs.parallel_workers }}"
             echo "Workflow=${{ github.workflow }}"
             echo "Run ID=${{ github.run_id }}"
           } > reports/allure-results/environment.properties

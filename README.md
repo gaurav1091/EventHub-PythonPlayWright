@@ -102,6 +102,8 @@ pre-commit run --all-files
 
 GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browser matrix. The workflow has been validated successfully in GitHub Actions. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.
 
+CI uses pytest-xdist for faster feedback: API jobs run with automatic workers, and each UI browser job runs with two workers. Manual workflow runs include a worker-count choice for serial debugging or parallel execution.
+
 
 ## Reporting
 
