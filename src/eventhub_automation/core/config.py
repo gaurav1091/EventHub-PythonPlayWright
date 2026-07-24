@@ -18,3 +18,4 @@ class Settings(BaseSettings):
     browser: str = Field(default="chromium", alias="BROWSER")
     headless: bool = Field(default=True, alias="HEADLESS")
     slow_mo_ms: int = Field(default=0, alias="SLOW_MO_MS")
+    environment: str = Field(default="practice", alias="EVENTHUB_ENV")

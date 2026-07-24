@@ -23,6 +23,13 @@ pytest
 
 See [Test Execution](docs/test_execution.md) for reporting, logging, browser, marker, and artifact commands.
 
+Named environment and suite profiles are available:
+
+```bash
+pytest --env qa --suite smoke
+pytest --suite api-regression -n auto --dist loadscope
+```
+
 ## Docker Quick Start
 
 Build the test image:
@@ -77,8 +84,10 @@ eventhub_pytest_framework/
 - Tests describe business behavior; page objects handle UI interaction.
 - Locators live in page classes, not in tests.
 - Configuration comes from environment variables and CLI options, not hard-coded credentials.
+- Environment profiles make target URLs explicit and reviewable.
 - API clients sit beside UI page objects, enabling hybrid setup/cleanup and faster validations.
 - API assertions and typed models keep service tests consistent without hiding raw responses.
+- Suite profiles and marker standards keep local, CI, smoke, regression, and release runs consistent.
 - Reports, traces, screenshots, and videos are generated only when useful.
 
 
@@ -90,6 +99,8 @@ Run local checks before pushing:
 ```bash
 ruff check src tests conftest.py
 mypy src tests conftest.py
+detect-secrets scan --baseline .secrets.baseline
+pip-audit
 pytest
 ```
 
@@ -100,7 +111,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-GitHub Actions runs linting, typing, API tests, and a Chromium/Firefox UI browser matrix. The workflow has been validated successfully in GitHub Actions. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.
+GitHub Actions runs linting, typing, security checks, API tests, and a Chromium/Firefox UI browser matrix. The workflow has been validated successfully in GitHub Actions. CI expects these repository secrets: `EVENTHUB_BASE_URL`, `EVENTHUB_USER_EMAIL`, and `EVENTHUB_USER_PASSWORD`.  # pragma: allowlist secret
 
 CI uses pytest-xdist for faster feedback: API jobs run with automatic workers, and each UI browser job runs with two workers. Manual workflow runs include a worker-count choice for serial debugging or parallel execution.
 
@@ -108,3 +119,7 @@ CI uses pytest-xdist for faster feedback: API jobs run with automatic workers, a
 ## Reporting
 
 The framework writes pytest-html, JUnit XML, logs, failure screenshots, Playwright traces, and Allure result files. GitHub Actions publishes the Allure HTML report to GitHub Pages and adds the report link to the workflow summary. Use `allure serve reports/allure-results` when the Allure CLI is installed locally.
+
+## Accessibility
+
+Accessibility smoke tests use axe through Playwright and are marked with `accessibility`.

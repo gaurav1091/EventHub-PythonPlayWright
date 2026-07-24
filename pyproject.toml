@@ -15,6 +15,7 @@ dependencies = [
     "pytest-xdist>=3.6.0",
     "pytest-rerunfailures>=14.0",
     "allure-pytest>=2.13.5",
+    "axe-playwright-python>=0.1.7",
     "python-dotenv>=1.0.1",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
@@ -26,6 +27,8 @@ dev = [
     "ruff>=0.5.0",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
+    "detect-secrets>=1.5.0",
+    "pip-audit>=2.7.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -67,4 +70,5 @@ markers = [
     "quarantine: temporarily excluded from default runs until fixed",
     "backend_gap: executable documentation of a known backend behavior gap",
     "serial: test intentionally requires exclusive shared state and should not be included in parallel runs",
+    "accessibility: automated accessibility checks",
 ]

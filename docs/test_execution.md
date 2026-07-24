@@ -41,6 +41,22 @@ Run against Firefox:
 pytest --browser-name firefox
 ```
 
+Run against a named environment profile:
+
+```bash
+pytest --env practice
+pytest --env qa
+```
+
+Run a named suite profile:
+
+```bash
+pytest --suite smoke
+pytest --suite api-regression
+pytest --suite ui-regression
+pytest --suite nightly
+```
+
 Run with pytest-xdist parallel workers:
 
 ```bash
@@ -86,6 +102,12 @@ Run API tests in parallel:
 docker compose run --rm eventhub-tests pytest tests/api -m api -n auto --dist loadscope
 ```
 
+Run a suite profile in Docker:
+
+```bash
+docker compose run --rm eventhub-tests pytest --suite smoke
+```
+
 The Docker service reads `.env` and mounts `reports/` plus `test-results/` so reports, logs, screenshots, Allure results, and traces are available on the host machine after the run.
 
 ## Reports And Artifacts
@@ -123,6 +145,7 @@ Allure reports are grouped automatically from pytest markers:
 - `regression`: broader coverage intended for scheduled or pre-release runs
 - `backend_gap`: known backend behavior gaps, normally paired with strict `xfail`
 - `serial`: intentionally excluded from parallel execution plans until isolated
+- `accessibility`: automated axe accessibility checks
 
 Browser-specific UI runs add the browser as an Allure parameter so Chromium and Firefox executions are reported separately.
 
@@ -134,6 +157,13 @@ Run static checks before a full regression:
 ```bash
 ruff check src tests conftest.py
 mypy src tests conftest.py
+```
+
+Run security checks locally:
+
+```bash
+detect-secrets scan --baseline .secrets.baseline
+pip-audit
 ```
 
 Install and run pre-commit hooks:
@@ -151,6 +181,7 @@ The workflow runs:
 
 - Ruff lint checks
 - mypy type checks
+- Secret scanning and Python dependency auditing
 - API tests
 - UI and hybrid tests across Chromium and Firefox
 - Parallel pytest workers for CI speed, using xdist `loadscope`
@@ -164,6 +195,11 @@ Push and pull request runs use these worker defaults:
 - UI Firefox: `-n 2 --dist loadscope`
 
 Manual workflow runs include a **Parallel pytest workers** choice. Use `1` for serial/debug runs, or `2`, `4`, or `auto` for parallel execution.
+
+Manual workflow runs also include:
+
+- **Test suite to run**: standard markers plus enterprise suite profiles such as `api-regression`, `ui-regression`, `nightly`, `release`, and `flaky-check`
+- **Target environment profile**: `practice` or `qa`
 
 After a GitHub Actions run finishes, open the workflow run summary and use the **Allure Report** link. Pull request runs do not publish the report to Pages.
 
@@ -210,6 +246,18 @@ assert event.title == "World Tech Summit"
 ```
 
 Raw `requests.Response` objects are still available from the client when a test needs to inspect non-standard payloads or backend gaps.
+
+## Accessibility Checks
+
+Accessibility smoke tests use axe through Playwright and fail on serious or critical violations. These tests are tagged with `@pytest.mark.accessibility`.
+
+Run them with:
+
+```bash
+pytest tests/ui/accessibility -m accessibility --browser-name chromium
+```
+
+Automated accessibility checks catch common issues, but they should complement manual accessibility review for critical journeys.
 
 ## Test Data Lifecycle
 

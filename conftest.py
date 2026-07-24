@@ -13,7 +13,9 @@ from pytest_metadata.plugin import metadata_key
 
 from eventhub_automation.api.eventhub_client import EventHubClient
 from eventhub_automation.core.config import Settings
+from eventhub_automation.core.environments import get_environment_profile
 from eventhub_automation.core.logger import get_logger
+from eventhub_automation.core.suites import get_suite_profile
 from eventhub_automation.data.lifecycle import TestDataManager, managed_test_data
 from eventhub_automation.flows.auth_flow import AuthFlow
 
@@ -34,11 +36,14 @@ ALLURE_MARKER_FEATURES = {
     "regression": ("Regression", "Full Coverage"),
     "backend_gap": ("Backend Gaps", "Known Product Gaps"),
     "serial": ("Execution Policy", "Serial Tests"),
+    "accessibility": ("Accessibility", "Automated WCAG Signals"),
 }
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--browser-name", action="store", default=None, help="chromium/firefox/webkit")
+    parser.addoption("--env", action="store", default=None, help="environment profile name")
+    parser.addoption("--suite", action="store", default=None, help="suite profile name")
     parser.addoption(
         "--run-quarantine",
         action="store_true",
@@ -62,12 +67,28 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    suite_name = config.getoption("--suite")
+    suite_profile = get_suite_profile(suite_name) if suite_name else None
     if config.getoption("--run-quarantine"):
-        return
+        skip_quarantine = None
+    else:
+        skip_quarantine = pytest.mark.skip(reason="quarantined; rerun with --run-quarantine")
 
-    skip_quarantine = pytest.mark.skip(reason="quarantined; rerun with --run-quarantine")
+    if suite_profile:
+        selected_items = []
+        deselected_items = []
+        for item in items:
+            if suite_profile.includes(set(item.keywords)):
+                selected_items.append(item)
+            else:
+                deselected_items.append(item)
+
+        if deselected_items:
+            config.hook.pytest_deselected(items=deselected_items)
+            items[:] = selected_items
+
     for item in items:
-        if "quarantine" in item.keywords:
+        if skip_quarantine and "quarantine" in item.keywords:
             item.add_marker(skip_quarantine)
 
 
@@ -112,10 +133,16 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
 @pytest.fixture(scope="session")
 def settings(request: pytest.FixtureRequest) -> Settings:
     settings = Settings()
+    environment = request.config.getoption("--env")
     browser_name = request.config.getoption("--browser-name")
     base_url = request.config.getoption("--base-url")
     headed = request.config.getoption("--headed")
 
+    if environment:
+        profile = get_environment_profile(environment)
+        settings.environment = profile.name
+        settings.base_url = profile.base_url
+        settings.api_base_url = profile.api_base_url
     if browser_name:
         settings.browser = browser_name
     if base_url:
