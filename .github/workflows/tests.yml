@@ -132,6 +132,7 @@ jobs:
       EVENTHUB_USER_EMAIL: ${{ secrets.EVENTHUB_USER_EMAIL }}
       EVENTHUB_USER_PASSWORD: ${{ secrets.EVENTHUB_USER_PASSWORD }}
       EVENTHUB_ENV: practice
+      EVENTHUB_SUITE_NAME: api
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -193,6 +194,7 @@ jobs:
       EVENTHUB_USER_EMAIL: ${{ secrets.EVENTHUB_USER_EMAIL }}
       EVENTHUB_USER_PASSWORD: ${{ secrets.EVENTHUB_USER_PASSWORD }}
       EVENTHUB_ENV: practice
+      EVENTHUB_SUITE_NAME: ui
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -254,6 +256,7 @@ jobs:
       TEST_TYPE: ${{ inputs.test_type }}
       SELECTED_BROWSER: ${{ inputs.browser }}
       PARALLEL_WORKERS: ${{ inputs.parallel_workers }}
+      EVENTHUB_SUITE_NAME: ${{ inputs.test_type }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

@@ -133,7 +133,7 @@ Open an Allure report when the Allure CLI is installed:
 allure serve reports/allure-results
 ```
 
-Allure reports are grouped automatically from pytest markers:
+Allure reports are grouped automatically from pytest markers and the selected suite:
 
 - `api`: service/API contract coverage
 - `auth`: login, registration, and session behavior
@@ -148,6 +148,7 @@ Allure reports are grouped automatically from pytest markers:
 - `accessibility`: automated axe accessibility checks
 
 Browser-specific UI runs add the browser as an Allure parameter so Chromium and Firefox executions are reported separately.
+CI runs also add the selected workflow suite as the Allure suite label, so manual runs such as `booking`, `contract`, or `visual` appear under that suite in the generated report.
 
 
 ## Local Quality Gates

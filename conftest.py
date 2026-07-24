@@ -41,6 +41,20 @@ ALLURE_MARKER_FEATURES = {
     "contract": ("API Contracts", "Schema Validation"),
 }
 
+ALLURE_MARKER_SUITES = (
+    "contract",
+    "visual",
+    "accessibility",
+    "api",
+    "e2e",
+    "smoke",
+    "auth",
+    "events",
+    "booking",
+    "admin",
+    "regression",
+)
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--browser-name", action="store", default=None, help="chromium/firefox/webkit")
@@ -110,6 +124,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     allure.dynamic.epic("EventHub")
+    allure.dynamic.parent_suite("EventHub Automation")
+    allure.dynamic.suite(_allure_suite_name(item))
     for marker_name, (feature, story) in ALLURE_MARKER_FEATURES.items():
         if marker_name in item.keywords:
             allure.dynamic.feature(feature)
@@ -119,6 +135,20 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     browser_name = item.config.getoption("--browser-name")
     if browser_name:
         allure.dynamic.parameter("browser", browser_name)
+
+
+def _allure_suite_name(item: pytest.Item) -> str:
+    configured_suite = item.config.getoption("--suite")
+    workflow_suite = os.getenv("EVENTHUB_SUITE_NAME")
+    if configured_suite:
+        return configured_suite
+    if workflow_suite:
+        return workflow_suite
+
+    for marker_name in ALLURE_MARKER_SUITES:
+        if marker_name in item.keywords:
+            return marker_name
+    return "all"
 
 
 @pytest.hookimpl(hookwrapper=True)
