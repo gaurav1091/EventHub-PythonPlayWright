@@ -23,6 +23,18 @@ ARTIFACTS_DIR = REPORTS_DIR / "artifacts"
 ALLURE_RESULTS_DIR = REPORTS_DIR / "allure-results"
 TRACES_DIR = Path("test-results") / "traces"
 
+ALLURE_MARKER_FEATURES = {
+    "api": ("API", "Service Contracts"),
+    "auth": ("Authentication", "Identity"),
+    "events": ("Events", "Event Discovery"),
+    "booking": ("Bookings", "Booking Lifecycle"),
+    "admin": ("Administration", "Event Management"),
+    "e2e": ("End To End", "User Journeys"),
+    "smoke": ("Smoke", "Critical Paths"),
+    "regression": ("Regression", "Full Coverage"),
+    "backend_gap": ("Backend Gaps", "Known Product Gaps"),
+}
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--browser-name", action="store", default=None, help="chromium/firefox/webkit")
@@ -59,6 +71,13 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
+    allure.dynamic.epic("EventHub")
+    for marker_name, (feature, story) in ALLURE_MARKER_FEATURES.items():
+        if marker_name in item.keywords:
+            allure.dynamic.feature(feature)
+            allure.dynamic.story(story)
+            allure.dynamic.tag(marker_name)
+
     browser_name = item.config.getoption("--browser-name")
     if browser_name:
         allure.dynamic.parameter("browser", browser_name)

@@ -1,46 +1,44 @@
 import pytest
 
+from eventhub_automation.api.assertions import (
+    assert_error_contains,
+    assert_status,
+    assert_success,
+    assert_validation_error,
+    parse_data,
+    parse_data_list,
+)
 from eventhub_automation.api.eventhub_client import EventHubClient
+from eventhub_automation.api.models import BookingResource, EventResource
 from eventhub_automation.data.factories import CustomerFactory, EventFactory
 
 
 @pytest.mark.api
 def test_get_event_by_valid_static_id(authenticated_api_client: EventHubClient):
     response = authenticated_api_client.get_event(1)
-    body = response.json()
+    event = parse_data(response, EventResource)
 
-    assert response.status_code == 200
-    assert body["success"] is True
-    assert body["data"]["id"] == 1
-    assert body["data"]["title"] == "World Tech Summit"
+    assert event.id == 1
+    assert event.title == "World Tech Summit"
 
 
 @pytest.mark.api
 def test_get_event_by_invalid_id_returns_not_found(authenticated_api_client: EventHubClient):
     response = authenticated_api_client.get_event(999999999)
-    body = response.json()
-
-    assert response.status_code == 404
-    assert body["success"] is False
-    assert "not found" in body["error"]
+    assert_error_contains(response, 404, "not found")
 
 
 @pytest.mark.api
 def test_delete_non_existing_event_returns_not_found(authenticated_api_client: EventHubClient):
     response = authenticated_api_client.delete_event(999999999)
-    body = response.json()
-
-    assert response.status_code == 404
-    assert body["success"] is False
-    assert "not found" in body["error"]
+    assert_error_contains(response, 404, "not found")
 
 
 @pytest.mark.api
 def test_static_event_cannot_be_deleted(authenticated_api_client: EventHubClient):
     response = authenticated_api_client.delete_event(1)
-    body = response.json()
+    body = assert_status(response, 403)
 
-    assert response.status_code == 403
     assert body["success"] is False
     assert body["error"] == "Cannot delete a static event"
 
@@ -103,21 +101,23 @@ def test_created_event_appears_in_list_and_disappears_after_delete(
 
     try:
         create_response = authenticated_api_client.create_event(event)
-        event_id = create_response.json()["data"]["id"]
+        create_body = assert_success(create_response, 201)
+        event_id = create_body["data"]["id"]
 
         list_response = authenticated_api_client.list_events()
-        listed_titles = {item["title"] for item in list_response.json()["data"]}
+        listed_titles = {item.title for item in parse_data_list(list_response, EventResource)}
 
-        assert create_response.status_code == 201
         assert event.title in listed_titles
 
         delete_response = authenticated_api_client.delete_event(event_id)
         event_id = 0
 
-        assert delete_response.status_code == 200
+        assert_success(delete_response)
 
         list_after_delete_response = authenticated_api_client.list_events()
-        titles_after_delete = {item["title"] for item in list_after_delete_response.json()["data"]}
+        titles_after_delete = {
+            item.title for item in parse_data_list(list_after_delete_response, EventResource)
+        }
 
         assert event.title not in titles_after_delete
     finally:
@@ -130,13 +130,10 @@ def test_invalid_event_creation_returns_validation_error(
     authenticated_api_client: EventHubClient,
 ):
     response = authenticated_api_client.create_event_with_payload({"title": "Invalid API Event"})
-    body = response.json()
-    error_fields = {detail["field"] for detail in body["details"]}
-
-    assert response.status_code == 400
-    assert body["success"] is False
-    assert body["error"] == "Validation failed"
-    assert {"category", "venue", "city", "eventDate", "price", "totalSeats"}.issubset(error_fields)
+    assert_validation_error(
+        response,
+        {"category", "venue", "city", "eventDate", "price", "totalSeats"},
+    )
 
 
 @pytest.mark.api
@@ -296,10 +293,10 @@ def test_booking_decrements_available_seats(authenticated_api_client: EventHubCl
         booking_id = booking_response.json()["data"]["id"]
 
         event_after_booking_response = authenticated_api_client.get_event(event_id)
-        event_after_booking = event_after_booking_response.json()["data"]
+        event_after_booking = parse_data(event_after_booking_response, EventResource)
 
-        assert booking_response.status_code == 201
-        assert event_after_booking["availableSeats"] == 22
+        assert_success(booking_response, 201)
+        assert event_after_booking.available_seats == 22
     finally:
         if booking_id:
             authenticated_api_client.cancel_booking(booking_id)
@@ -325,11 +322,11 @@ def test_cancelling_booking_releases_available_seats(authenticated_api_client: E
         booking_id = 0
 
         event_after_cancel_response = authenticated_api_client.get_event(event_id)
-        event_after_cancel = event_after_cancel_response.json()["data"]
+        event_after_cancel = parse_data(event_after_cancel_response, EventResource)
 
-        assert booking_response.status_code == 201
-        assert cancel_response.status_code == 200
-        assert event_after_cancel["availableSeats"] == 25
+        assert_success(booking_response, 201)
+        assert_success(cancel_response)
+        assert event_after_cancel.available_seats == 25
     finally:
         if booking_id:
             authenticated_api_client.cancel_booking(booking_id)
@@ -342,11 +339,7 @@ def test_cancelling_booking_releases_available_seats(authenticated_api_client: E
 def test_booking_creation_rejects_invalid_event_id(authenticated_api_client: EventHubClient):
     customer = CustomerFactory.booking_customer(email_prefix="codex.invalid.event")
     response = authenticated_api_client.create_booking(999999999, customer)
-    body = response.json()
-
-    assert response.status_code == 404
-    assert body["success"] is False
-    assert "not found" in body["error"]
+    assert_error_contains(response, 404, "not found")
 
 
 @pytest.mark.api
@@ -424,11 +417,7 @@ def test_lookup_invalid_booking_reference_returns_not_found(
     authenticated_api_client: EventHubClient,
 ):
     response = authenticated_api_client.get_booking_by_reference("NO-SUCH-REF")
-    body = response.json()
-
-    assert response.status_code == 404
-    assert body["success"] is False
-    assert "not found" in body["error"]
+    assert_error_contains(response, 404, "not found")
 
 
 @pytest.mark.api
@@ -478,12 +467,10 @@ def test_get_booking_by_id(authenticated_api_client: EventHubClient):
         booking_id = booking_response.json()["data"]["id"]
 
         get_response = authenticated_api_client.get_booking(booking_id)
-        body = get_response.json()
+        booking = parse_data(get_response, BookingResource)
 
-        assert get_response.status_code == 200
-        assert body["success"] is True
-        assert body["data"]["id"] == booking_id
-        assert body["data"]["customerEmail"] == customer.email
+        assert booking.id == booking_id
+        assert booking.customer_email == customer.email
     finally:
         if booking_id:
             authenticated_api_client.cancel_booking(booking_id)
@@ -506,9 +493,8 @@ def test_list_bookings_includes_newly_created_booking(authenticated_api_client: 
         booking_id = booking_response.json()["data"]["id"]
 
         list_response = authenticated_api_client.list_bookings()
-        booking_ids = {booking["id"] for booking in list_response.json()["data"]}
+        booking_ids = {booking.id for booking in parse_data_list(list_response, BookingResource)}
 
-        assert list_response.status_code == 200
         assert booking_id in booking_ids
     finally:
         if booking_id:
@@ -538,11 +524,7 @@ def test_user_cannot_book_more_seats_than_available(authenticated_api_client: Ev
         event_response = authenticated_api_client.create_event(event)
         event_id = event_response.json()["data"]["id"]
         response = authenticated_api_client.create_booking(event_id, customer, quantity=3)
-        body = response.json()
-
-        assert response.status_code == 400
-        assert body["success"] is False
-        assert "available" in body["error"]
+        assert_error_contains(response, 400, "available")
     finally:
         if event_id:
             authenticated_api_client.delete_event(event_id)

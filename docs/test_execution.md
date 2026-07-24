@@ -26,6 +26,15 @@ Run API tests:
 pytest -m api
 ```
 
+Run a product area:
+
+```bash
+pytest -m auth
+pytest -m events
+pytest -m booking
+pytest -m admin
+```
+
 Run against Firefox:
 
 ```bash
@@ -83,6 +92,20 @@ Open an Allure report when the Allure CLI is installed:
 allure serve reports/allure-results
 ```
 
+Allure reports are grouped automatically from pytest markers:
+
+- `api`: service/API contract coverage
+- `auth`: login, registration, and session behavior
+- `events`: event discovery, filtering, and details
+- `booking`: booking creation, lookup, cancellation, and seat behavior
+- `admin`: admin event management
+- `e2e`: cross-page user journeys
+- `smoke`: critical health checks and core user confidence tests
+- `regression`: broader coverage intended for scheduled or pre-release runs
+- `backend_gap`: known backend behavior gaps, normally paired with strict `xfail`
+
+Browser-specific UI runs add the browser as an Allure parameter so Chromium and Firefox executions are reported separately.
+
 
 ## Local Quality Gates
 
@@ -137,6 +160,25 @@ pytest --run-quarantine
 Use `@pytest.mark.flaky` only for tests with a documented intermittent external dependency. Prefer fixing selectors, waits, and test data isolation before adding retry behavior.
 
 Known backend behavior gaps should use `@pytest.mark.backend_gap` plus `pytest.mark.xfail(..., strict=True)` so the suite tells us when the backend behavior changes.
+
+## API Test Style
+
+Prefer the shared API assertion helpers over repeating raw response checks:
+
+```python
+body = assert_success(response, 201)
+assert_validation_error(response, {"email"})
+assert_error_contains(response, 404, "not found")
+```
+
+Use typed API models when asserting stable resource fields:
+
+```python
+event = parse_data(response, EventResource)
+assert event.title == "World Tech Summit"
+```
+
+Raw `requests.Response` objects are still available from the client when a test needs to inspect non-standard payloads or backend gaps.
 
 ## Test Data Lifecycle
 

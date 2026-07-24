@@ -54,8 +54,12 @@ eventhub_pytest_framework/
   docs/
   src/eventhub_automation/
     api/
+      assertions.py
+      eventhub_client.py
+      models.py
     core/
     data/
+    flows/
     pages/
   tests/
     api/
@@ -74,6 +78,7 @@ eventhub_pytest_framework/
 - Locators live in page classes, not in tests.
 - Configuration comes from environment variables and CLI options, not hard-coded credentials.
 - API clients sit beside UI page objects, enabling hybrid setup/cleanup and faster validations.
+- API assertions and typed models keep service tests consistent without hiding raw responses.
 - Reports, traces, screenshots, and videos are generated only when useful.
 
 

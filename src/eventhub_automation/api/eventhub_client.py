@@ -4,6 +4,8 @@ from typing import Any
 import requests
 from requests import Response
 
+from eventhub_automation.api.assertions import parse_data, parse_data_list
+from eventhub_automation.api.models import BookingResource, EventResource
 from eventhub_automation.data.users import BookingCustomer, EventData
 
 
@@ -54,6 +56,9 @@ class EventHubClient:
     def list_events(self) -> Response:
         return self.session.get(f"{self.base_url}/events", timeout=15)
 
+    def events(self) -> list[EventResource]:
+        return parse_data_list(self.list_events(), EventResource)
+
     def find_event_by_title(self, event_title: str) -> dict[str, Any] | None:
         response = self.list_events()
         response.raise_for_status()
@@ -69,6 +74,9 @@ class EventHubClient:
 
     def get_event(self, event_id: int) -> Response:
         return self.session.get(f"{self.base_url}/events/{event_id}", timeout=15)
+
+    def event(self, event_id: int) -> EventResource:
+        return parse_data(self.get_event(event_id), EventResource)
 
     def create_event(self, event: EventData) -> Response:
         return self.session.post(
@@ -93,8 +101,14 @@ class EventHubClient:
     def list_bookings(self) -> Response:
         return self.session.get(f"{self.base_url}/bookings", timeout=15)
 
+    def bookings(self) -> list[BookingResource]:
+        return parse_data_list(self.list_bookings(), BookingResource)
+
     def get_booking(self, booking_id: int) -> Response:
         return self.session.get(f"{self.base_url}/bookings/{booking_id}", timeout=15)
+
+    def booking(self, booking_id: int) -> BookingResource:
+        return parse_data(self.get_booking(booking_id), BookingResource)
 
     def get_booking_by_reference(self, booking_reference: str) -> Response:
         return self.session.get(f"{self.base_url}/bookings/ref/{booking_reference}", timeout=15)
