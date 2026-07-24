@@ -120,6 +120,7 @@ The framework generates these artifacts:
 - `reports/artifacts/`: screenshots attached to failed HTML report entries
 - `test-results/traces/`: Playwright traces retained on failure
 - `reports/allure-results/`: Allure-compatible result files
+- `reports/flakiness/run.json`: per-run flakiness and retry analytics
 
 Open a retained Playwright trace with:
 
@@ -203,6 +204,7 @@ Manual workflow runs also include:
 - **Target environment profile**: `practice` or `qa`
 
 After a GitHub Actions run finishes, open the workflow run summary and use the **Allure Report** link. Pull request runs do not publish the report to Pages.
+Published reports also include a **Flakiness Dashboard** link. It preserves the latest run history, retry counts, flaky markers, quarantine markers, failed tests, and top flaky tests across published GitHub Pages reports.
 
 Before using the hosted report link, configure the repository Pages source as **GitHub Actions** in GitHub repository settings.
 
@@ -224,6 +226,8 @@ pytest --run-quarantine
 ```
 
 Use `@pytest.mark.flaky` only for tests with a documented intermittent external dependency. Prefer fixing selectors, waits, and test data isolation before adding retry behavior.
+
+Every pytest run writes `reports/flakiness/run.json`. In GitHub Actions, these per-job files are merged into the published flakiness dashboard at `flakiness/`, giving a lightweight history of retries, failures, flaky tests, and quarantined tests outside the normal Allure trend view.
 
 Known backend behavior gaps should use `@pytest.mark.backend_gap` plus `pytest.mark.xfail(..., strict=True)` so the suite tells us when the backend behavior changes.
 

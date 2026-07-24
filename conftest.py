@@ -4,6 +4,7 @@ import re
 import shutil
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import allure
 import pytest
@@ -18,12 +19,18 @@ from eventhub_automation.core.logger import get_logger
 from eventhub_automation.core.suites import get_suite_profile
 from eventhub_automation.data.lifecycle import TestDataManager, managed_test_data
 from eventhub_automation.flows.auth_flow import AuthFlow
+from eventhub_automation.reporting.flakiness import build_flakiness_run_report, utc_now
 
 LOGGER = get_logger("pytest")
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = REPORTS_DIR / "artifacts"
 ALLURE_RESULTS_DIR = REPORTS_DIR / "allure-results"
+FLAKINESS_DIR = REPORTS_DIR / "flakiness"
 TRACES_DIR = Path("test-results") / "traces"
+FLAKINESS_REPORTS_KEY = pytest.StashKey[list[dict[str, Any]]]()
+FLAKINESS_MARKERS_KEY = pytest.StashKey[dict[str, list[str]]]()
+FLAKINESS_STARTED_AT_KEY = pytest.StashKey[str]()
+ACTIVE_PYTEST_CONFIG: pytest.Config | None = None
 
 ALLURE_MARKER_FEATURES = {
     "api": ("API", "Service Contracts"),
@@ -54,6 +61,7 @@ ALLURE_MARKER_SUITES = (
     "admin",
     "regression",
 )
+FLAKINESS_MARKER_NAMES = frozenset({*ALLURE_MARKER_FEATURES, "flaky", "quarantine"})
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -75,6 +83,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    global ACTIVE_PYTEST_CONFIG
+    ACTIVE_PYTEST_CONFIG = config
     clean_reports = os.getenv("EVENTHUB_CLEAN_REPORTS", "true").lower() in {"1", "true", "yes"}
     is_xdist_worker = hasattr(config, "workerinput")
     if clean_reports and not is_xdist_worker:
@@ -83,7 +93,11 @@ def pytest_configure(config: pytest.Config) -> None:
 
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     ALLURE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    FLAKINESS_DIR.mkdir(parents=True, exist_ok=True)
     TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    config.stash[FLAKINESS_REPORTS_KEY] = []
+    config.stash[FLAKINESS_MARKERS_KEY] = {}
+    config.stash[FLAKINESS_STARTED_AT_KEY] = utc_now()
     config.stash[metadata_key]["Project"] = "EventHub Pytest Automation"
     config.stash[metadata_key]["Base URL"] = Settings().base_url
 
@@ -118,6 +132,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             items[:] = selected_items
 
     for item in items:
+        config.stash[FLAKINESS_MARKERS_KEY][item.nodeid] = [
+            marker.name for marker in item.iter_markers()
+        ]
         if skip_quarantine and "quarantine" in item.keywords:
             item.add_marker(skip_quarantine)
 
@@ -149,6 +166,42 @@ def _allure_suite_name(item: pytest.Item) -> str:
         if marker_name in item.keywords:
             return marker_name
     return "all"
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if ACTIVE_PYTEST_CONFIG is None:
+        return
+    config = ACTIVE_PYTEST_CONFIG
+    config.stash[FLAKINESS_REPORTS_KEY].append(
+        {
+            "nodeid": report.nodeid,
+            "when": report.when,
+            "outcome": report.outcome,
+            "duration": report.duration,
+            "rerun": getattr(report, "rerun", None),
+            "markers": sorted(set(report.keywords) & FLAKINESS_MARKER_NAMES),
+            "longrepr": report.longreprtext if report.failed else None,
+            "wasxfail": getattr(report, "wasxfail", None),
+        }
+    )
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if hasattr(session.config, "workerinput"):
+        return
+
+    settings = Settings()
+    suite_name = session.config.getoption("--suite") or os.getenv("EVENTHUB_SUITE_NAME", "all")
+    browser_name = session.config.getoption("--browser-name") or os.getenv("BROWSER")
+    build_flakiness_run_report(
+        reports=session.config.stash[FLAKINESS_REPORTS_KEY],
+        marker_map=session.config.stash[FLAKINESS_MARKERS_KEY],
+        started_at=session.config.stash[FLAKINESS_STARTED_AT_KEY],
+        output_path=FLAKINESS_DIR / "run.json",
+        suite_name=suite_name,
+        browser_name=browser_name,
+        environment_name=settings.environment,
+    )
 
 
 @pytest.hookimpl(hookwrapper=True)

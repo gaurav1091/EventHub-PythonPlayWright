@@ -133,6 +133,7 @@ jobs:
       EVENTHUB_USER_PASSWORD: ${{ secrets.EVENTHUB_USER_PASSWORD }}
       EVENTHUB_ENV: practice
       EVENTHUB_SUITE_NAME: api
+      EVENTHUB_JOB_NAME: api
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -195,6 +196,7 @@ jobs:
       EVENTHUB_USER_PASSWORD: ${{ secrets.EVENTHUB_USER_PASSWORD }}
       EVENTHUB_ENV: practice
       EVENTHUB_SUITE_NAME: ui
+      EVENTHUB_JOB_NAME: ui-${{ matrix.browser }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -257,6 +259,7 @@ jobs:
       SELECTED_BROWSER: ${{ inputs.browser }}
       PARALLEL_WORKERS: ${{ inputs.parallel_workers }}
       EVENTHUB_SUITE_NAME: ${{ inputs.test_type }}
+      EVENTHUB_JOB_NAME: manual-${{ inputs.test_type }}-${{ inputs.browser }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -410,6 +413,9 @@ jobs:
       name: github-pages
       url: ${{ steps.report-url.outputs.url }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Download manual test report artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/download-artifact@v4
@@ -487,9 +493,14 @@ jobs:
             </head>
             <body>
               <p><a href="$report_path/">Open latest Allure report</a></p>
+              <p><a href="flakiness/">Open flakiness dashboard</a></p>
             </body>
           </html>
           EOF
+
+      - name: Build flakiness dashboard
+        if: steps.allure-results.outputs.result_count != '0'
+        run: python scripts/build_flakiness_dashboard.py --artifacts-dir downloaded-artifacts --site-dir site --run-id "${{ github.run_id }}"
 
       - name: Save published report history
         if: steps.allure-results.outputs.result_count != '0'
@@ -524,5 +535,7 @@ jobs:
           echo "### Allure Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "[Open this run's Allure report](${{ steps.report-url.outputs.url }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open flakiness dashboard](${{ steps.deployment.outputs.page_url }}flakiness/)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Report path: \`runs/${{ github.run_id }}/\`" >> "$GITHUB_STEP_SUMMARY"
