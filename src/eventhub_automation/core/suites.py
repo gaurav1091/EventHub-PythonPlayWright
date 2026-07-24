@@ -41,6 +41,12 @@ SUITE_PROFILES = {
         frozenset({"flaky"}),
         excluded_markers=frozenset({"quarantine"}),
     ),
+    "contract": SuiteProfile(
+        "contract",
+        "API schema and contract validation",
+        frozenset({"contract"}),
+    ),
+    "visual": SuiteProfile("visual", "Visual regression screenshot checks", frozenset({"visual"})),
 }
 
 

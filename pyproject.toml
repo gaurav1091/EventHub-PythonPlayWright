@@ -16,6 +16,7 @@ dependencies = [
     "pytest-rerunfailures>=14.0",
     "allure-pytest>=2.13.5",
     "axe-playwright-python>=0.1.7",
+    "pillow>=10.0.0",
     "python-dotenv>=1.0.1",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
@@ -71,4 +72,6 @@ markers = [
     "backend_gap: executable documentation of a known backend behavior gap",
     "serial: test intentionally requires exclusive shared state and should not be included in parallel runs",
     "accessibility: automated accessibility checks",
+    "visual: visual regression screenshot checks",
+    "contract: API response schema and contract validation tests",
 ]

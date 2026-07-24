@@ -29,6 +29,8 @@ on:
           - booking
           - admin
           - accessibility
+          - contract
+          - visual
       browser:
         description: "Browser for UI-capable test suites"
         required: true
@@ -268,7 +270,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Install Playwright browsers
-        if: inputs.test_type != 'api' && inputs.test_type != 'api-regression'
+        if: inputs.test_type != 'api' && inputs.test_type != 'api-regression' && inputs.test_type != 'contract'
         run: |
           if [ "$SELECTED_BROWSER" = "chrome" ]; then
             PLAYWRIGHT_BROWSER="chromium"
@@ -322,6 +324,12 @@ jobs:
             flaky-check)
               pytest_args=(-m "flaky and not quarantine" --suite flaky-check)
               ;;
+            contract)
+              pytest_args=(tests/api -m "contract and not quarantine" --suite contract)
+              ;;
+            visual)
+              pytest_args=(tests/ui/visual -m "visual and not quarantine" --suite visual --run-visual)
+              ;;
             smoke|auth|events|booking|admin|accessibility)
               pytest_args=(tests/ui -m "$TEST_TYPE and not quarantine")
               ;;
@@ -342,7 +350,7 @@ jobs:
             xdist_args=(-n "$PARALLEL_WORKERS" --dist loadscope)
           fi
 
-          if [ "$TEST_TYPE" = "api" ] || [ "$TEST_TYPE" = "api-regression" ]; then
+          if [ "$TEST_TYPE" = "api" ] || [ "$TEST_TYPE" = "api-regression" ] || [ "$TEST_TYPE" = "contract" ]; then
             pytest "${pytest_args[@]}" "${xdist_args[@]}"
           elif [ "$SELECTED_BROWSER" = "all" ]; then
             pytest "${pytest_args[@]}" --browser-name chromium "${xdist_args[@]}"

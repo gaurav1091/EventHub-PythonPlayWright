@@ -28,6 +28,8 @@ Named environment and suite profiles are available:
 ```bash
 pytest --env qa --suite smoke
 pytest --suite api-regression -n auto --dist loadscope
+pytest --suite contract
+pytest tests/ui/visual --suite visual --run-visual --browser-name chromium
 ```
 
 ## Docker Quick Start
@@ -88,6 +90,8 @@ eventhub_pytest_framework/
 - API clients sit beside UI page objects, enabling hybrid setup/cleanup and faster validations.
 - API assertions and typed models keep service tests consistent without hiding raw responses.
 - Suite profiles and marker standards keep local, CI, smoke, regression, and release runs consistent.
+- Contract tests validate API response schemas with typed models and shared assertions.
+- Visual regression tests compare reviewed baselines in a dedicated opt-in suite.
 - Reports, traces, screenshots, and videos are generated only when useful.
 
 
@@ -123,3 +127,7 @@ The framework writes pytest-html, JUnit XML, logs, failure screenshots, Playwrig
 ## Accessibility
 
 Accessibility smoke tests use axe through Playwright and are marked with `accessibility`.
+
+## Visual Regression
+
+Visual checks are marked with `visual` and are intentionally opt-in so regular UI reports only show the selected functional tests. To update a baseline, run the visual suite, review the image under `reports/visual/`, and replace the matching file under `tests/ui/visual/baselines/` only when the UI change is expected.

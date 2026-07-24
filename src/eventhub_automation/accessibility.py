@@ -6,11 +6,7 @@ from playwright.sync_api import Page
 def assert_no_critical_accessibility_violations(page: Page) -> None:
     results = Axe().run(page)
     all_violations = results.response["violations"]
-    violations = [
-        violation
-        for violation in all_violations
-        if violation["impact"] == "critical"
-    ]
+    violations = [violation for violation in all_violations if violation["impact"] == "critical"]
 
     if all_violations:
         allure.attach(

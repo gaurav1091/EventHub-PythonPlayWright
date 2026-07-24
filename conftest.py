@@ -37,6 +37,8 @@ ALLURE_MARKER_FEATURES = {
     "backend_gap": ("Backend Gaps", "Known Product Gaps"),
     "serial": ("Execution Policy", "Serial Tests"),
     "accessibility": ("Accessibility", "Automated WCAG Signals"),
+    "visual": ("Visual Regression", "Screenshot Baselines"),
+    "contract": ("API Contracts", "Schema Validation"),
 }
 
 
@@ -49,6 +51,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="include tests marked quarantine",
+    )
+    parser.addoption(
+        "--run-visual",
+        action="store_true",
+        default=False,
+        help="include visual regression tests",
     )
 
 
@@ -69,19 +77,27 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     suite_name = config.getoption("--suite")
     suite_profile = get_suite_profile(suite_name) if suite_name else None
+    mark_expression = config.option.markexpr or ""
+    run_visual = (
+        config.getoption("--run-visual") or suite_name == "visual" or "visual" in mark_expression
+    )
     if config.getoption("--run-quarantine"):
         skip_quarantine = None
     else:
         skip_quarantine = pytest.mark.skip(reason="quarantined; rerun with --run-quarantine")
 
-    if suite_profile:
+    if suite_profile or not run_visual:
         selected_items = []
         deselected_items = []
         for item in items:
-            if suite_profile.includes(set(item.keywords)):
-                selected_items.append(item)
-            else:
+            keywords = set(item.keywords)
+            excluded_by_suite = suite_profile and not suite_profile.includes(keywords)
+            excluded_visual = not run_visual and "visual" in keywords
+
+            if excluded_by_suite or excluded_visual:
                 deselected_items.append(item)
+            else:
+                selected_items.append(item)
 
         if deselected_items:
             config.hook.pytest_deselected(items=deselected_items)
